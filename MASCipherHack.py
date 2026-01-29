@@ -17,6 +17,17 @@ ENGLISH_FREQ = {
     'S': 6.3, 'H': 6.1, 'R': 6.0, 'D': 4.3, 'L': 4.0,
 }
 
+COMMON_DIGRAMS = [
+    "TH", "HE", "IN", "ER", "AN", "RE", "ON", "AT", "EN", "ND"
+]
+
+COMMON_TRIGRAMS = [
+    "THE", "AND", "FOR"
+]
+COMMON_WORDS = [
+    "THE", "AND", "OVER", "FOX", "DOG", "BROWN"
+]
+
 def create_random_string():
     return ''.join(random.sample(string.ascii_uppercase, 26))
 
@@ -44,7 +55,13 @@ current_key = create_random_string()
 current_score = float('inf')
 
 # Iterations to run through
-loading_bar = trange(100000)
+loading_bar = trange(500000)
+
+top_results = [
+    (float('inf'), "", ""),
+    (float('inf'), "", ""),
+    (float('inf'), "", "")
+]
 
 for i in loading_bar:
 
@@ -62,21 +79,41 @@ for i in loading_bar:
         else:
             plaintext += char
 
-    candidate_score = letter_frequency_score(text)
+    # ---- Scoring Math ----
+    freq_score = letter_frequency_score(text)
+
+    digram_penalty = 0
+    for dg in COMMON_DIGRAMS:
+        digram_penalty -= plaintext.count(dg) * 2
+
+    trigram_penalty = 0
+    for tg in COMMON_TRIGRAMS:
+        trigram_penalty -= plaintext.count(tg) * 4
+
+    word_bonus = 0
+    for word in COMMON_WORDS:
+        if word in plaintext:
+            word_bonus -= 10
+
+    candidate_score = freq_score + digram_penalty + trigram_penalty + word_bonus
+    # ----------------------
 
     if candidate_score < current_score:
         current_key = candidate_key
         current_score = candidate_score
 
-        # Update global best
-        if candidate_score < best_score:
-            best_score = candidate_score
-            best_key = candidate_key
-            best_answer = plaintext
-    
+    # Put score into top 3 if better than the worse
+    if candidate_score < top_results[2][0]:
+        top_results[2] = (candidate_score, candidate_key, plaintext)
+        top_results.sort(key=lambda x: x[0])
+
     if i % 100 == 0:
-        loading_bar.set_description(f"Best score: {best_score:.2f}")
+        loading_bar.set_description(f"Best score: {top_results[0][0]:.2f}")
 
 loading_bar.close()
-print("Key\t\t\t\tScore\t\t\tPlaintext")
-print(f"{best_key}\t{best_score}\t{best_answer}")
+
+print("\nTop 3 Results:")
+print("Rank\tScore\t\tKey\t\t\tPlaintext")
+
+for i, (score, key, text) in enumerate(top_results, start=1):
+    print(f"{i}\t{score:.2f}\t{key}\t{text}")
