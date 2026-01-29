@@ -4,12 +4,15 @@ from tqdm import trange
 
 CAESAR_OFFSET = 65
 alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+best_score = float('inf')
+# Simulated annealing
+INITIAL_PROBABILITY = 0.02
+FINAL_PROBABILITY = 0.0001
+# Amount of iterations and restart to run
+RESTARTS = 20
+ITERATIONS_PER_RESTART = 100000
 
 encrypted = input("Input text to decrypt: ").upper()
-
-best_key = ""
-best_score = float('inf')
-best_answer = ""
 
 # Letter-frequency scoring
 ENGLISH_FREQ = {
@@ -24,11 +27,18 @@ COMMON_DIGRAMS = [
 COMMON_TRIGRAMS = [
     "THE", "AND", "FOR"
 ]
+
 COMMON_WORDS = [
-    "THE", "AND", "OVER", "FOX", "DOG", "BROWN"
+    "THE", "AND", "TO", "OF", "IN", "IS", "OVER", "FOR", "ON",
+    "WITH", "FOX", "DOG", "BROWN", "JUMPS", "LAZY"
 ]
 
-def create_random_string():
+COMMON_SMALL_WORDS = {
+    "THE", "OF", "TO", "IN", "IS", "IT", "YOU", "THAT",
+    "AND", "FOR", "ON", "WITH", "AS", "AT"
+}
+
+def create_random_key():
     return ''.join(random.sample(string.ascii_uppercase, 26))
 
 def letter_frequency_score(text):
@@ -42,7 +52,7 @@ def letter_frequency_score(text):
         observed = text.count(letter) / total * 100
         score += abs(observed - expected)
 
-    return score  # lower = better
+    return score
 
 def swap_two_letters(key):
     key_list = list(key)
@@ -50,12 +60,9 @@ def swap_two_letters(key):
     key_list[i], key_list[j] = key_list[j], key_list[i]
     return ''.join(key_list)
 
-# Initial key generation
-current_key = create_random_string()
-current_score = float('inf')
-
-# Iterations to run through
-loading_bar = trange(500000)
+# Progress Bar stuff to account for restarts
+TOTAL_ITERATIONS = RESTARTS * ITERATIONS_PER_RESTART
+loading_bar = trange(TOTAL_ITERATIONS)
 
 top_results = [
     (float('inf'), "", ""),
@@ -63,52 +70,71 @@ top_results = [
     (float('inf'), "", "")
 ]
 
-for i in loading_bar:
+for restart in range(RESTARTS):
 
-    candidate_key = swap_two_letters(current_key)
+    current_key = create_random_key()
+    current_score = float('inf')
 
-    plaintext = ""
-    text = ""
+    for i in range(ITERATIONS_PER_RESTART):
+        loading_bar.update(1)
 
-    for char in encrypted:
-        if 'A' <= char <= 'Z':
-            position = ord(char) - CAESAR_OFFSET
-            decoded_char = candidate_key[position]
-            plaintext += decoded_char
-            text += decoded_char
-        else:
-            plaintext += char
+        candidate_key = swap_two_letters(current_key)
 
-    # ---- Scoring Math ----
-    freq_score = letter_frequency_score(text)
+        plaintext = ""
+        text = ""
 
-    digram_penalty = 0
-    for dg in COMMON_DIGRAMS:
-        digram_penalty -= plaintext.count(dg) * 2
+        for char in encrypted:
+            if 'A' <= char <= 'Z':
+                position = ord(char) - CAESAR_OFFSET
+                decoded_char = candidate_key[position]
+                plaintext += decoded_char
+                text += decoded_char
+            else:
+                plaintext += char
 
-    trigram_penalty = 0
-    for tg in COMMON_TRIGRAMS:
-        trigram_penalty -= plaintext.count(tg) * 4
+        # ---- Scoring Math ----
+        freq_score = letter_frequency_score(text)
+        freq_score *= 0.5
 
-    word_bonus = 0
-    for word in COMMON_WORDS:
-        if word in plaintext:
-            word_bonus -= 10
+        digram_penalty = 0
+        for dg in COMMON_DIGRAMS:
+            digram_penalty -= plaintext.count(dg)
 
-    candidate_score = freq_score + digram_penalty + trigram_penalty + word_bonus
-    # ----------------------
+        trigram_penalty = 0
+        for tg in COMMON_TRIGRAMS:
+            trigram_penalty -= plaintext.count(tg) * 2
 
-    if candidate_score < current_score:
-        current_key = candidate_key
-        current_score = candidate_score
+        word_bonus = 0
+        words = plaintext.split()
+        for w in words:
+            if w in COMMON_SMALL_WORDS:
+                if w == "YOU" and len(words) > 1:
+                    word_bonus -= 1
+                else:
+                    word_bonus -= 5
+            elif len(w) <= 3:
+                word_bonus += 2   # penalize short words that arent "words"
+            elif 4 <= len(w) <= 7 and w not in COMMON_WORDS:
+                word_bonus += 3 # penalize random 4-7 letter words
 
-    # Put score into top 3 if better than the worse
-    if candidate_score < top_results[2][0]:
-        top_results[2] = (candidate_score, candidate_key, plaintext)
-        top_results.sort(key=lambda x: x[0])
+        candidate_score = freq_score + digram_penalty + trigram_penalty + word_bonus
+        # ----------------------
 
-    if i % 100 == 0:
-        loading_bar.set_description(f"Best score: {top_results[0][0]:.2f}")
+        progress = loading_bar.n / TOTAL_ITERATIONS
+        acceptable_prob = INITIAL_PROBABILITY * (1 - progress) + FINAL_PROBABILITY * progress
+
+        if candidate_score < current_score or random.random() < acceptable_prob:
+            current_key = candidate_key
+            current_score = candidate_score
+
+        if candidate_score < top_results[2][0]:
+            top_results[2] = (candidate_score, candidate_key, plaintext)
+            top_results.sort(key=lambda x: x[0])
+
+        if i % 100 == 0:
+            loading_bar.set_description(
+                f"Best score: {top_results[0][0]:.2f}"
+            )
 
 loading_bar.close()
 
