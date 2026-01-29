@@ -6,11 +6,11 @@ CAESAR_OFFSET = 65
 alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 best_score = float('inf')
 # Simulated annealing
-INITIAL_PROBABILITY = 0.02
+INITIAL_PROBABILITY = 0.03
 FINAL_PROBABILITY = 0.0001
 # Amount of iterations and restart to run
-RESTARTS = 20
-ITERATIONS_PER_RESTART = 100000
+RESTARTS = 25
+ITERATIONS_PER_RESTART = 80000
 
 encrypted = input("Input text to decrypt: ").upper()
 
@@ -21,21 +21,19 @@ ENGLISH_FREQ = {
 }
 
 COMMON_DIGRAMS = [
-    "TH", "HE", "IN", "ER", "AN", "RE", "ON", "AT", "EN", "ND"
+    "TH", "HE", "IN", "ER", "AN", "RE", "ON", "AT", "EN", "ND", "ED", "AR", "AL", "ET", "ED", "IT"
 ]
 
 COMMON_TRIGRAMS = [
-    "THE", "AND", "FOR"
+    "THE", "AND", "FOR", "ING", "ION", "TIO", "ENT", "THA", "HER", "TER", "ERE", "ATE", "HIS", 
 ]
 
 COMMON_WORDS = [
-    "THE", "AND", "TO", "OF", "IN", "IS", "OVER", "FOR", "ON",
-    "WITH", "FOX", "DOG", "BROWN", "JUMPS", "LAZY"
+    "THE", "AND", "TO", "OF", "IN", "IS", "BE", "FOR", "ON", "WITH", "THERE", "THAT", "HAVE", "ANY", "HOW"
 ]
 
 COMMON_SMALL_WORDS = {
-    "THE", "OF", "TO", "IN", "IS", "IT", "YOU", "THAT",
-    "AND", "FOR", "ON", "WITH", "AS", "AT"
+    "THE", "BE", "TO", "OF", "AND", "A", "IN", "THAT", "HAVE", "I", "IT", "FOR", "NOT", "ON", "WITH", "HE", "AS", "YOU", "DO", "AT", "HOW"
 }
 
 def create_random_key():
@@ -108,10 +106,7 @@ for restart in range(RESTARTS):
         words = plaintext.split()
         for w in words:
             if w in COMMON_SMALL_WORDS:
-                if w == "YOU" and len(words) > 1:
-                    word_bonus -= 1
-                else:
-                    word_bonus -= 5
+                word_bonus -= 5
             elif len(w) <= 3:
                 word_bonus += 2   # penalize short words that arent "words"
             elif 4 <= len(w) <= 7 and w not in COMMON_WORDS:
